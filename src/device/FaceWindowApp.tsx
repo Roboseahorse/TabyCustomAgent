@@ -1,4 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+/**
+ * Mock Physical Taby face — minimal black tile.
+ * Assets are 280×456; rotated -90° for upright desktop viewing.
+ */
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  DEFAULT_ANIMATION_MAP,
+  durationMsFor,
+  gifForAnimationId,
+  LOOPING_ANIMATION_IDS,
+} from "./animationMap";
 import {
   FACE_LABELS,
   publishFaceState,
@@ -6,46 +16,87 @@ import {
   subscribeFaceState,
   type FaceDisplayState,
 } from "./faceBus";
-import {
-  DEFAULT_ANIMATION_MAP,
-  durationMsFor,
-  gifForAnimationId,
-  LOOPING_ANIMATION_IDS,
-} from "./animationMap";
-import "../styles/tokens.css";
-import "../App.css";
 
 const IDLE_VARIANTS = ["idle_01_loop", "idle_02_loop"] as const;
-/** Still hold at end of each idle loop before switching (ms) */
 const IDLE_STILL_PAUSE_MS = 900;
 
-const INITIAL: FaceDisplayState = {
-  animationId: "idle_01_loop",
-  label: "Idle",
-  at: Date.now(),
-  connected: false,
-};
+function nextIdle(current: string): string {
+  const pool = IDLE_VARIANTS.filter((x) => x !== current);
+  return pool[Math.floor(Math.random() * pool.length)] ?? "idle_01_loop";
+}
 
 function gifSrc(id: string, token: number): string | null {
-  const base = gifForAnimationId(id);
-  if (!base) return null;
-  const sep = base.includes("?") ? "&" : "?";
-  return `${base}${sep}t=${token}`;
+  const path = gifForAnimationId(id);
+  if (!path) return null;
+  return `${path}?t=${token}`;
 }
 
-function nextIdle(current: string): string {
-  const idx = IDLE_VARIANTS.indexOf(current as (typeof IDLE_VARIANTS)[number]);
-  if (idx < 0) return IDLE_VARIANTS[0];
-  return IDLE_VARIANTS[(idx + 1) % IDLE_VARIANTS.length];
-}
+/** Inline styles so popup windows can’t miss delayed CSS. */
+const shellStyle: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  margin: 0,
+  padding: 0,
+  width: "100%",
+  height: "100%",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: "#000",
+  overflow: "hidden",
+};
+
+const frameStyle: CSSProperties = {
+  width: "100%",
+  height: "100%",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: "#000",
+  overflow: "hidden",
+};
+
+const gifStyle: CSSProperties = {
+  display: "block",
+  background: "#000",
+  /* 280×456 file → after -90° reads upright on desktop */
+  width: "min(100vh, 100vw * 456 / 280)",
+  height: "min(100vw, 100vh * 280 / 456)",
+  objectFit: "fill",
+  transform: "rotate(-90deg)",
+  transformOrigin: "center center",
+};
 
 export function FaceWindowApp() {
   const [face, setFace] = useState<FaceDisplayState>(
-    () => readFaceState() ?? INITIAL
+    () =>
+      readFaceState() ?? {
+        animationId: "idle_01_loop",
+        label: "Idle",
+        at: Date.now(),
+        connected: false,
+      }
   );
   const [token, setToken] = useState(0);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastId = useRef<string>("");
+  const lastId = useRef(face.animationId);
+
+  useEffect(() => {
+    const prevHtml = document.documentElement.style.background;
+    const prevBody = document.body.style.background;
+    document.documentElement.style.background = "#000";
+    document.body.style.background = "#000";
+    document.body.style.margin = "0";
+    document.body.style.overflow = "hidden";
+    document.documentElement.classList.add("face-window");
+    document.body.classList.add("face-window");
+    return () => {
+      document.documentElement.style.background = prevHtml;
+      document.body.style.background = prevBody;
+      document.documentElement.classList.remove("face-window");
+      document.body.classList.remove("face-window");
+    };
+  }, []);
 
   useEffect(() => {
     return subscribeFaceState((s) => {
@@ -55,26 +106,20 @@ export function FaceWindowApp() {
   }, []);
 
   useEffect(() => {
-    if (idleTimer.current) {
-      clearTimeout(idleTimer.current);
-      idleTimer.current = null;
-    }
+    lastId.current = face.animationId;
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+
     const id = face.animationId || "idle_01_loop";
-    lastId.current = id;
-    if (!face.connected) return;
-
     const isIdle =
-      id === "idle_01_loop" ||
-      id === "idle_02_loop" ||
-      id === "idle";
+      id === "idle" || id === "idle_01_loop" || id === "idle_02_loop";
 
-    // One-shots → idle after duration + postDone delay
-    if (!LOOPING_ANIMATION_IDS.has(id) && !isIdle) {
+    if (LOOPING_ANIMATION_IDS.has(id) && !isIdle) {
       const clipMs = durationMsFor(DEFAULT_ANIMATION_MAP, id);
       const extra = DEFAULT_ANIMATION_MAP.postDoneDelayMs ?? 1200;
       idleTimer.current = setTimeout(() => {
         if (lastId.current !== id) return;
-        const pick = IDLE_VARIANTS[Math.floor(Math.random() * IDLE_VARIANTS.length)];
+        const pick =
+          IDLE_VARIANTS[Math.floor(Math.random() * IDLE_VARIANTS.length)];
         publishFaceState({
           animationId: pick,
           label: FACE_LABELS[pick] ?? "Idle",
@@ -87,7 +132,6 @@ export function FaceWindowApp() {
       };
     }
 
-    // Idle loops: play full duration, short still pause, then different idle
     if (isIdle) {
       const clipMs = durationMsFor(DEFAULT_ANIMATION_MAP, id, 8000);
       idleTimer.current = setTimeout(() => {
@@ -114,16 +158,18 @@ export function FaceWindowApp() {
   return (
     <div
       className={`face-shell face-shell--minimal${face.connected ? " is-connected" : ""}`}
+      style={shellStyle}
       title={title}
     >
-      <div className="face-stage" aria-live="polite">
-        <div className="face-gif-frame">
+      <div className="face-stage" style={frameStyle} aria-live="polite">
+        <div className="face-gif-frame" style={frameStyle}>
           {src ? (
             <img
               key={`${id}-${token}`}
               src={src}
               alt={title}
               className="face-gif"
+              style={gifStyle}
               draggable={false}
             />
           ) : (

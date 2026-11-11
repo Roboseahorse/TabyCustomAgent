@@ -3,70 +3,41 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { FaceWindowApp } from "./device/FaceWindowApp";
 import "./styles/tokens.css";
+import "./App.css";
 
-const params = new URLSearchParams(window.location.search);
-const isFaceWindow =
-  params.get("face") === "1" || params.get("window") === "face";
-
-class RootErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { error: Error | null }
-> {
-  state: { error: Error | null } = { error: null };
-
-  static getDerivedStateFromError(error: Error) {
-    return { error };
+function detectFaceWindow(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("face") === "1" || params.get("window") === "face") return true;
+  // window.open(..., "face") sets this — survives some query-string quirks
+  if (window.name === "face" || window.name === "taby-face") return true;
+  if (window.location.hash === "#face") return true;
+  try {
+    if (sessionStorage.getItem("taby-render-face") === "1") return true;
+  } catch {
+    /* ignore */
   }
-
-  componentDidCatch(error: Error) {
-    console.error("Taby Custom Agent crashed:", error);
-  }
-
-  render() {
-    if (this.state.error) {
-      return (
-        <div
-          style={{
-            padding: 24,
-            fontFamily: "system-ui, sans-serif",
-            color: "#f4f4f5",
-            background: "#16161a",
-            minHeight: "100vh",
-            boxSizing: "border-box",
-          }}
-        >
-          <h1 style={{ fontSize: 18, margin: "0 0 12px" }}>
-            Taby Custom Agent — UI error
-          </h1>
-          <pre
-            style={{
-              whiteSpace: "pre-wrap",
-              fontSize: 12,
-              opacity: 0.85,
-              lineHeight: 1.4,
-            }}
-          >
-            {this.state.error.message}
-            {"\n\n"}
-            {this.state.error.stack}
-          </pre>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
+  return false;
 }
 
-const rootEl = document.getElementById("root");
-if (rootEl) {
-  ReactDOM.createRoot(rootEl).render(
-    <React.StrictMode>
-      <RootErrorBoundary>
-        {isFaceWindow ? <FaceWindowApp /> : <App />}
-      </RootErrorBoundary>
-    </React.StrictMode>
-  );
-} else {
-  document.body.innerHTML =
-    '<p style="padding:24px;font-family:sans-serif">#root missing</p>';
+const isFaceWindow = detectFaceWindow();
+
+if (isFaceWindow) {
+  try {
+    sessionStorage.setItem("taby-render-face", "1");
+  } catch {
+    /* ignore */
+  }
+  document.documentElement.classList.add("face-window");
+  document.body.classList.add("face-window");
+  document.documentElement.style.background = "#000";
+  document.body.style.background = "#000";
+  document.body.style.margin = "0";
+  document.body.style.overflow = "hidden";
+  document.title = "Taby";
 }
+
+ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+  <React.StrictMode>
+    {isFaceWindow ? <FaceWindowApp /> : <App />}
+  </React.StrictMode>
+);
