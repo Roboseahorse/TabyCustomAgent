@@ -112,14 +112,10 @@ export function FaceWindowApp() {
   const src = gifSrc(id, token);
 
   return (
-    <div className={`face-shell${face.connected ? " is-connected" : ""}`}>
-      <header className="face-header">
-        <span className="face-brand">Mock Taby</span>
-        <span className={`face-conn ${face.connected ? "on" : "off"}`}>
-          {face.connected ? "connected" : "offline"}
-        </span>
-      </header>
-
+    <div
+      className={`face-shell face-shell--minimal${face.connected ? " is-connected" : ""}`}
+      title={title}
+    >
       <div className="face-stage" aria-live="polite">
         <div className="face-gif-frame">
           {src ? (
@@ -131,17 +127,12 @@ export function FaceWindowApp() {
               draggable={false}
             />
           ) : (
-            <div className="face-gif-missing">No GIF for “{id}”</div>
+            <div className="face-gif-missing" aria-hidden>
+              ···
+            </div>
           )}
         </div>
-        <p className="face-label">{title}</p>
-        <p className="face-id">animation: {id}</p>
       </div>
-
-      <footer className="face-footer">
-        Preview GIFs from Physical Taby firmware assets (TRIIIS LABS). Keep
-        identified as Taby — personal / integration use.
-      </footer>
     </div>
   );
 }

@@ -9,7 +9,6 @@ import {
 import { NavToggle } from "./NavToggle";
 import type { ChatAttachment } from "../chat/attachments";
 import { AttachmentChips } from "../chat/AttachmentChips";
-import { FACE_LABELS, publishFaceState } from "../device/faceBus";
 
 export type CompactPromptProps = {
   connectionLabel: string;
@@ -74,7 +73,7 @@ export function CompactPrompt({
 
   return (
     <div
-      className={`hud-compact${dragOver ? " is-dragover" : ""}`}
+      className={`hud-compact${dragOver ? " is-dragover" : ""}${connectionOk ? " is-ready" : " is-offline"}`}
       role="dialog"
       aria-label="Taby prompt"
       onKeyDown={handleKeyDown}
@@ -94,7 +93,7 @@ export function CompactPrompt({
       <form className="hud-compact-form" onSubmit={handleSubmit}>
         <NavToggle expanded={navExpanded} onToggle={onToggleNav} />
         <span
-          className={`hud-connection-dot ${connectionOk ? "ok" : "off"}`}
+          className={`hud-connection-pill ${connectionOk ? "ok" : "off"}`}
           title={connectionLabel}
           aria-label={connectionLabel}
         />
@@ -102,18 +101,9 @@ export function CompactPrompt({
           ref={inputRef}
           className="hud-prompt-input"
           type="text"
-          placeholder="What can you do?"
+          placeholder="Ask me anything or /"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          onPaste={() => {
-            publishFaceState({
-              animationId: "copy_paste",
-              label: FACE_LABELS.copy_paste ?? "Copy / paste",
-              at: Date.now(),
-              connected: true,
-              force: true,
-            });
-          }}
           aria-label="Prompt"
         />
         <input
@@ -133,37 +123,44 @@ export function CompactPrompt({
           aria-label="Attach file"
           onClick={() => fileRef.current?.click()}
         >
-          <UploadIcon />
+          <PaperclipIcon />
         </button>
         <button
           type="button"
           className="hud-icon-btn"
-          title="Voice (soon)"
+          title="Voice"
           aria-label="Voice input"
           onClick={onVoiceClick}
         >
           <MicIcon />
         </button>
-        <button
-          type="submit"
-          className="hud-send-btn"
-          disabled={!canSend}
-          aria-label="Send"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
-            <path d="M12 19V5M12 5l-6 6M12 5l6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
+        {canSend && (
+          <button
+            type="submit"
+            className="hud-send-btn is-active"
+            aria-label="Send"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
+              <path
+                d="M12 19V5M12 5l-5 5M12 5l5 5"
+                stroke="currentColor"
+                strokeWidth="2.25"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        )}
       </form>
     </div>
   );
 }
 
-function UploadIcon() {
+function PaperclipIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path
-        d="M12 16V4M12 4L8 8M12 4l4 4M4 20h16"
+        d="M8.5 12.5l6.2-6.2a3 3 0 114.2 4.2L9.5 20a4.5 4.5 0 11-6.4-6.4l9.2-9.2"
         stroke="currentColor"
         strokeWidth="1.75"
         strokeLinecap="round"
